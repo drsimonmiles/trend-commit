@@ -1,4 +1,3 @@
-import scala.annotation.tailrec
 import scala.util.Random.{nextDouble => randomDouble, nextInt => randomInt}
 
 object Simulation extends App {
@@ -23,7 +22,7 @@ object Simulation extends App {
   // List of agents
   val agents: Vector[Int] =
     (0 until numberOfAgents).toVector
-  // Neighbour hood links between agents
+  // Neighbourhood links between agents
   val network: Vector[(Int, Int)] =
     if (useSmallWorldNetwork) smallWorldNetwork (numberOfAgents, averageDegree, nonLatticeProbability)
     else scaleFreeNetwork (numberOfAgents)
@@ -48,8 +47,6 @@ object Simulation extends App {
   val actionReward: Map[Int, Map[Int, Double]] =
     agents.map (agent => (agent, actionRewardVector (randomInt (numberOfActions)))).toMap
 
-  println (actionReward.values.reduce ((a, b) => a.map (c => (c._1, c._2 + b (c._1)))).mapValues (_.toInt).toVector.sortBy (_._1))
-
   // The function returning the coordination matrix value given the distance from the main diagonal,
   //   distance varies from 0.0 on the diagonal to 1.0 at the extreme corners
   def miscoordination (distanceFromDiagonal: Double): Double =
@@ -57,14 +54,12 @@ object Simulation extends App {
       if (distanceFromDiagonal == 0.0) 1.0 else 0.0
     else
       1.0 - distanceFromDiagonal
-  // The coordination reward matrix
+  // The coordination reward matrix, maps a pair of actions to a utility multiplier
   val coordinationReward: Map[(Int, Int), Double] =
     (for (x <- 0 until numberOfActions; y <- 0 until numberOfActions) yield {
       val distance = (x - y).abs.toDouble / (numberOfActions - 1)
       ((x, y), miscoordination (distance))
     }).toMap
-
-  println ((0 until numberOfActions).map (coordinationReward (_, 0)).mkString ("[", ", ", "]"))
 
   // Calculate the reward from an interaction between two agents performing given actions
   def interactionReward (instigatorAgent: Int, instigatorAction: Int, receiverAction: Int): Double =
@@ -91,13 +86,14 @@ object Simulation extends App {
 
   // The log of results of the simulation, aggregated as we go along to conserve memory
   // The structure of this log can be changed as new outputs are required
-  // Currently, it records the list of strategies per round and the pooulation utility per round
+  // Currently, it records the list of strategies per round and the population utility per round
   case class SimulationRecord (strategies: Vector[Vector[Int]], roundUtility: Vector[Double])
   // The empty simulation record, to be added to as the simulation runs
   // This can be adjusted if SimulationRecord is changed to add new fields
   val emptySimulationRecord: SimulationRecord = SimulationRecord (Vector.empty, Vector.empty)
   // Aggregates the full data from a round into the running simulation record, given the strategy per agent that round
   //  and records of all interactions that round
+  // The strategy parameter is a mapping of agents to their strategies this round
   // This can be altered along with SimulationRecord to accumulate other data as needed
   def aggregateRoundResults (previous: SimulationRecord, strategy: Map[Int, Int],
                              roundInteractions: Vector[InteractionRecord]): SimulationRecord =
@@ -107,7 +103,7 @@ object Simulation extends App {
 
   // Perform one simulation of the above defined environment
   def simulate (): SimulationRecord = {
-    // Current strategy of each agent
+    // Current strategy of each agent, initialise to random actions
     var strategy: Map[Int, Int] =
       agents.map (agent => (agent, randomInt (numberOfActions))).toMap
     // The memorised interaction records of the agents, for the last copyFrequency rounds
@@ -115,7 +111,7 @@ object Simulation extends App {
     // The running results from this simulation run
     var results = emptySimulationRecord
 
-    for (round <- 0 until numberOfRounds) yield {
+    for (round <- 0 until numberOfRounds) {
       // Map agents to the action they perform this round, either their strategy or a random exploration
       val roundAction = agents.map (agent => (agent,
         if (randomDouble < explorationProbability) randomInt (numberOfActions) else strategy (agent))).toMap
@@ -160,6 +156,7 @@ object Simulation extends App {
   def cumulativeUtility (results: SimulationRecord, from: Int, until: Int): Double =
     results.roundUtility.slice (from, until).sum
 
+  // Temporary logging for debugging
   println (record.head.strategies.last.take (50))
   println (record.head.strategies.last.distinct)
   println (record.head.strategies.last.distinct.map (n => record.head.strategies.last.count (_ == n)).sorted.reverse)
@@ -185,18 +182,24 @@ object Simulation extends App {
 object Networks {
   /** Generate a scale-free network with a given number of nodes using Barabási-Albert model. */
   def scaleFreeNetwork (numberOfNodes: Int): Vector[(Int, Int)] = {
-    @tailrec
+    // Given a set of edges created so far and the degrees of nodes added so far, add the rest of the nodes
     def addNodes (edgesSoFar: Vector[(Int, Int)], nodeDegrees: Vector[Int]): Vector[(Int, Int)] =
+      // If the number of nodes we've added is the total, return the network
       if (nodeDegrees.size == numberOfNodes) edgesSoFar
       else {
-        @tailrec
+        // Sum the degrees of all nodes, choose a random value from 1 to that sum
+        // Treat this value like an index to find an existing node which the new node is then connected to
+        // The index locates the node by deducting each node degree until the index reduces to/below zero
+        // This is equivalent to selecting a node with a probability based on its node degree
         def locateNode (position: Int, fromIndex: Int): Int =
           if (position - nodeDegrees (fromIndex) <= 0) fromIndex
           else locateNode (position - nodeDegrees (fromIndex), fromIndex + 1)
         val connectTo = locateNode (randomInt (nodeDegrees.sum) + 1, 0)
+        // Update the node degrees to account for the new edge and add the remaining nodes
         val newDegrees = 1 +: nodeDegrees.updated (connectTo, nodeDegrees (connectTo) + 1)
         addNodes ((nodeDegrees.size, connectTo) +: edgesSoFar, newDegrees)
       }
+    // Start with the first two nodes and their connecting edge in place and then add the rest
     addNodes (Vector ((0, 1)), Vector (1, 1))
   }
 
@@ -205,9 +208,10 @@ object Networks {
   def smallWorldNetwork (numberOfNodes: Int, averageDegree: Int, nonLatticeProbability: Double): Vector[(Int, Int)] = {
     // Generate a regular ring lattice as a starting point
     val lattice = ringLattice (numberOfNodes, averageDegree)
+    // Convenience function to return a value unchanged if below a threshold, value+1 if over the threshold
+    def incrementIfOver (value: Int, threshold: Int): Int = if (value < threshold) value else value + 1
     // Returns a random node excluding the given node
     def randomNodeExcluding (exclude: Int): Int = incrementIfOver (randomInt (numberOfNodes - 1), exclude)
-    def incrementIfOver (value: Int, threshold: Int): Int = if (value < threshold) value else value + 1
     // Returns true if the neighbour is within averageDegree/2 to the right of node around the ring
     def withinDistanceToRight (neighbour: Int, node: Int): Boolean =
       (if (neighbour > node) neighbour else neighbour + numberOfNodes) <= node + averageDegree / 2
