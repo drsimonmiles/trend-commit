@@ -28,7 +28,7 @@ object Simulation extends App {
     else scaleFreeNetwork (numberOfAgents)
   // Map of each agent to a list of its neighbours
   val neighbours: Map[Int, Vector[Int]] =
-    agents.map (agent => (agent, connected (agent, network))).toMap
+    agents.map (agent => agent -> connected (agent, network)).toMap
   // Choose a random neighbour of the given agent
   def randomNeighbour (agent: Int): Int = {
     val neighbourhood = neighbours (agent)
@@ -38,14 +38,13 @@ object Simulation extends App {
   // List of possible actions
   val actions: Vector[Int] =
     (0 until numberOfActions).toVector
-
   // Create an agent's reward vector where the utility of the given ideal action is 1.0 tailoring linearly to 0.0
   //   on either side
   def actionRewardVector (ideal: Int): Map[Int, Double] =
-    actions.map (action => (action, (1.0 + (if (action >= ideal) ideal - action else action - ideal) * 2.0 / numberOfActions).max (0.0))).toMap
+    actions.map (action => action -> (1.0 + (if (action >= ideal) ideal - action else action - ideal) * 2.0 / numberOfActions).max (0.0)).toMap
   // Map of each agent to its action reward vector
   val actionReward: Map[Int, Map[Int, Double]] =
-    agents.map (agent => (agent, actionRewardVector (randomInt (numberOfActions)))).toMap
+    agents.map (agent => agent -> actionRewardVector (randomInt (numberOfActions))).toMap
 
   // The function returning the coordination matrix value given the distance from the main diagonal,
   //   distance varies from 0.0 on the diagonal to 1.0 at the extreme corners
@@ -58,17 +57,15 @@ object Simulation extends App {
   val coordinationReward: Map[(Int, Int), Double] =
     (for (x <- 0 until numberOfActions; y <- 0 until numberOfActions) yield {
       val distance = (x - y).abs.toDouble / (numberOfActions - 1)
-      ((x, y), miscoordination (distance))
+      (x, y) -> miscoordination (distance)
     }).toMap
 
   // Calculate the reward from an interaction between two agents performing given actions
   def interactionReward (instigatorAgent: Int, instigatorAction: Int, receiverAction: Int): Double =
     actionReward (instigatorAgent)(instigatorAction) * coordinationReward (instigatorAction, receiverAction)
-
   // A record of the interaction between two agents, giving their actions and the instigator's reward
   case class InteractionRecord (instigatorAgent: Int, receiverAgent: Int,
                                 instigatorAction: Int, receiverAction: Int, reward: Double)
-
   // Execute an interaction between two agents performing actions, returning the interaction record
   def interact (instigatorAgent: Int, receiverAgent: Int, instigatorAction: Int, receiverAction: Int): InteractionRecord =
     InteractionRecord (instigatorAgent, receiverAgent, instigatorAction, receiverAction,
@@ -94,7 +91,7 @@ object Simulation extends App {
   // Aggregates the full data from a round into the running simulation record, given the strategy per agent that round
   //  and records of all interactions that round
   // The strategy parameter is a mapping of agents to their strategies this round
-  // This can be altered along with SimulationRecord to accumulate other data as needed
+  // This function's implementation can be altered along with SimulationRecord to accumulate other data as needed
   def aggregateRoundResults (previous: SimulationRecord, strategy: Map[Int, Int],
                              roundInteractions: Vector[InteractionRecord]): SimulationRecord =
     SimulationRecord (
@@ -105,7 +102,8 @@ object Simulation extends App {
   def simulate (): SimulationRecord = {
     // Current strategy of each agent, initialise to random actions
     var strategy: Map[Int, Int] =
-      agents.map (agent => (agent, randomInt (numberOfActions))).toMap
+      agents.map (agent => agent -> randomInt (numberOfActions)).toMap
+    println (strategy.groupBy (_._2).mapValues (_.size).toVector.sortBy (_._2))
     // The memorised interaction records of the agents, for the last copyFrequency rounds
     var history = Vector[Vector[InteractionRecord]] ()
     // The running results from this simulation run
@@ -113,8 +111,8 @@ object Simulation extends App {
 
     for (round <- 0 until numberOfRounds) {
       // Map agents to the action they perform this round, either their strategy or a random exploration
-      val roundAction = agents.map (agent => (agent,
-        if (randomDouble < explorationProbability) randomInt (numberOfActions) else strategy (agent))).toMap
+      val roundAction = agents.map (agent => agent ->
+        (if (randomDouble < explorationProbability) randomInt (numberOfActions) else strategy (agent))).toMap
       // Perform interactions by all agents for this round, returning the interaction records
       val interactions: Vector[InteractionRecord] =
         (for (instigator <- 0 until numberOfAgents; _ <- 1 to interactionsInstigatedPerRound) yield {
@@ -128,7 +126,9 @@ object Simulation extends App {
         // Get the history of interaction records as a single set, rather than per round
         val allHistory = history.flatten
         // Set the strategy for each agent to be the best of those they've observed from the remembered history
-        strategy = agents.map (agent => (agent, bestStrategy (observedInteractions (agent, allHistory)))).toMap
+        strategy = agents.map (agent => agent -> bestStrategy (observedInteractions (agent, allHistory))).toMap
+
+        if (round >= 0 && round < 5) println (strategy.groupBy (_._2).mapValues (_.size).toVector.sortBy (_._2))
       }
       // Aggregate the round's results into the running results object
       results = aggregateRoundResults (results, strategy, interactions)
