@@ -4,12 +4,12 @@ object Simulation extends App {
   import Networks._
 
   // Network generation parameters
-  val numberOfAgents = 300
+  val numberOfAgents = 500
   val useSmallWorldNetwork = false    // false = scale-free, true = small world
   val averageDegree = 4               // parameter for small world network: should be even
   val nonLatticeProbability = 0.4     // parameter for small world network generation (beta parameter)
   // Other model parameters
-  val numberOfActions = 21
+  val numberOfActions = 40
   val interactionsInstigatedPerRound = 4     // Number of interactions each agent instigates per round
   val explorationProbability = 0.1           // Likelihood of an agent trying a random action for a round
   val copyFrequency = 1                      // How many rounds between agents copying each others' best strategies
@@ -19,7 +19,7 @@ object Simulation extends App {
   val numberOfSimulations = 1
   val convergencePercentage = 0.95     // The percentage of agents with same strategy required for convergence
 
-  // List of agents
+  // List of agents, just integers from 0 to numberOfAgents - 1
   val agents: Vector[Int] =
     (0 until numberOfAgents).toVector
   // Neighbourhood links between agents
@@ -35,7 +35,7 @@ object Simulation extends App {
     neighbourhood (randomInt (neighbourhood.size))
   }
 
-  // List of possible actions
+  // List of possible actions, just integers from 0 to numberOfActions - 1
   val actions: Vector[Int] =
     (0 until numberOfActions).toVector
   // Create an agent's reward vector where the utility of the given ideal action is 1.0 tailoring linearly to 0.0
@@ -60,16 +60,18 @@ object Simulation extends App {
       (x, y) -> miscoordination (distance)
     }).toMap
 
-  // Calculate the reward from an interaction between two agents performing given actions
-  def interactionReward (instigatorAgent: Int, instigatorAction: Int, receiverAction: Int): Double =
-    actionReward (instigatorAgent)(instigatorAction) * coordinationReward (instigatorAction, receiverAction)
+  // Calculate one agent's reward from an interaction between itself and another agent, each performing given actions
+  def interactionReward (agent: Int, action: Int, othersAction: Int): Double =
+    actionReward (agent)(action) * coordinationReward (action, othersAction)
   // A record of the interaction between two agents, giving their actions and the instigator's reward
   case class InteractionRecord (instigatorAgent: Int, receiverAgent: Int,
-                                instigatorAction: Int, receiverAction: Int, reward: Double)
+                                instigatorAction: Int, receiverAction: Int,
+                                instigatorReward: Double, receiverReward: Double)
   // Execute an interaction between two agents performing actions, returning the interaction record
   def interact (instigatorAgent: Int, receiverAgent: Int, instigatorAction: Int, receiverAction: Int): InteractionRecord =
     InteractionRecord (instigatorAgent, receiverAgent, instigatorAction, receiverAction,
-      interactionReward (instigatorAgent, instigatorAction, receiverAction))
+      interactionReward (instigatorAgent, instigatorAction, receiverAction),
+      interactionReward (receiverAgent, receiverAction, instigatorAction))
 
   // Return all interactions from the given set which the given agent observed, i.e. was a participant
   def observedInteractions (observerAgent: Int, records: Vector[InteractionRecord]): Vector[InteractionRecord] =
@@ -78,8 +80,16 @@ object Simulation extends App {
   def mean (values: Vector[Double]): Double =
     values.sum / values.size
   // Return the action producing the best average reward as recorded in the given interaction records
-  def bestStrategy (records: Vector[InteractionRecord]): Int =
-    records.groupBy (_.instigatorAction).mapValues (records => mean (records.map (_.reward))).maxBy (_._2)._1
+  def bestStrategy (records: Vector[InteractionRecord]): Int = {
+    // List of tuples of (action, reward) for instigators of the given interactions
+    val rewardsPerInstigatorAction = records.map (record => (record.instigatorAction, record.instigatorReward))
+    // List of tuples of (action, reward) for receivers of the given interactions
+    val rewardsPerReceiverAction = records.map (record => (record.receiverAction, record.receiverReward))
+    // Map of action to the list of (action, reward) tuples for both instigators and receivers
+    val rewardsPerAction = (rewardsPerInstigatorAction ++ rewardsPerReceiverAction).groupBy (_._1)
+    // Calculate the mean reward per action, and return the action with the maximum reward
+    rewardsPerAction.mapValues (records => mean (records.map (_._2))).maxBy (_._2)._1
+  }
 
   // The log of results of the simulation, aggregated as we go along to conserve memory
   // The structure of this log can be changed as new outputs are required
@@ -96,7 +106,8 @@ object Simulation extends App {
                              roundInteractions: Vector[InteractionRecord]): SimulationRecord =
     SimulationRecord (
       previous.strategies :+ strategy.valuesIterator.toVector,
-      previous.roundUtility :+ roundInteractions.map (_.reward).sum)
+      previous.roundUtility :+ roundInteractions.map (
+        interaction => interaction.instigatorReward + interaction.receiverReward).sum)
 
   // Perform one simulation of the above defined environment
   def simulate (): SimulationRecord = {
