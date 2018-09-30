@@ -194,7 +194,7 @@ object Networks {
   /** Generate a scale-free network with a given number of nodes using Barabási-Albert model. */
   def scaleFreeNetwork (numberOfNodes: Int): Vector[(Int, Int)] = {
     // Given a set of edges created so far and the degrees of nodes added so far, add the rest of the nodes
-    def addNodes (edgesSoFar: Vector[(Int, Int)], nodeDegrees: Vector[Int]): Vector[(Int, Int)] =
+    def addNodes (edgesSoFar: Vector[(Int, Int)], nodeDegrees: Vector[Int], degreeSum: Int): Vector[(Int, Int)] =
       // If the number of nodes we've added is the total, return the network
       if (nodeDegrees.size == numberOfNodes) edgesSoFar
       else {
@@ -208,10 +208,10 @@ object Networks {
         val connectTo = locateNode (randomInt (nodeDegrees.sum) + 1, 0)
         // Update the node degrees to account for the new edge and add the remaining nodes
         val newDegrees = 1 +: nodeDegrees.updated (connectTo, nodeDegrees (connectTo) + 1)
-        addNodes ((nodeDegrees.size, connectTo) +: edgesSoFar, newDegrees)
+        addNodes ((nodeDegrees.size, connectTo) +: edgesSoFar, newDegrees, degreeSum + 2)
       }
     // Start with the first two nodes and their connecting edge in place and then add the rest
-    addNodes (Vector ((0, 1)), Vector (1, 1))
+    addNodes (Vector ((0, 1)), Vector (1, 1), 2)
   }
 
   /** Generate a small world network with a given number of nodes, average degree and
