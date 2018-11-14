@@ -211,24 +211,26 @@ object Simulation extends App {
   }
 
   // Perform one simulation of the above defined environment
-  def simulate (): SimulationRecord = {
+  def simulate (committing: Boolean): SimulationRecord = {
     // Initial strategy of each agent, random actions
     val initialStrategy: Map[Agent, Action] = agents.createMap (agent => randomAction)
     // Simulate from round 0, starting with no interaction history and an empty simulation record
-    simulateFromRound (round = 0, initialStrategy, Vector.empty, agents.createMap (_ => 0), committing = true,
+    simulateFromRound (round = 0, initialStrategy, Vector.empty, agents.createMap (_ => 0), committing,
       emptySimulationRecord (initialStrategy))
   }
 
   // Run a set of simulations in parallel, capture the results
-  val record: Vector[SimulationRecord] =
-    (0 until numberOfSimulations).par.map {_ => simulate ()}.seq.toVector
+  val recordNoCommitting: Vector[SimulationRecord] =
+    (0 until numberOfSimulations).par.map {_ => simulate (committing = false)}.seq.toVector
+  val recordCommitting: Vector[SimulationRecord] =
+    (0 until numberOfSimulations).par.map {_ => simulate (committing = true)}.seq.toVector
 
   //plotConvergence (record)
 
   if (aggregateLog) {
-    println (logTopStrategiesPerRound (record, 5, 5, numberOfRounds) + "\n")
-    println (logObservedStrategyUtilitiesPerRound (record, 5, 5, numberOfRounds, agents) + "\n")
-    println (logFinalStrategyDistribution (record) + "\n")
+    println (logTopStrategiesPerRound (recordNoCommitting, 5, 5, numberOfRounds) + "\n")
+    //println (logObservedStrategyUtilitiesPerRound (recordNoCommitting, 5, 5, numberOfRounds, agents) + "\n")
+    println (logFinalStrategyDistribution (recordNoCommitting) + "\n")
   }
 
   // Returns true if any strategy has converged given the list of strategies agents have in a round
@@ -240,21 +242,28 @@ object Simulation extends App {
   def firstConverge (results: SimulationRecord): Int =
     results.strategies.indexWhere (hasConverged)
   // A map of simulation records to the round where they first converged, excluding simulations that did not converge
-  val converging: Vector[(SimulationRecord, Int)] =
-    record.map (sim => (sim, firstConverge (sim))).filter (_._2 != -1)
+  val convergingNoCommitting: Vector[(SimulationRecord, Int)] =
+    recordNoCommitting.map (sim => (sim, firstConverge (sim))).filter (_._2 != -1)
+  val convergingCommitting: Vector[(SimulationRecord, Int)] =
+    recordCommitting.map (sim => (sim, firstConverge (sim))).filter (_._2 != -1)
   // Calculate the cumulative utility over the given rounds (from <= round < until) of a simulation
   def cumulativeUtility (results: SimulationRecord, from: Int, until: Int): Double =
     results.roundUtility.slice (from, until).sum
 
   // Print percentage of simulations that converged to a norm
-  println (s"Simulations converging to a norm: ${converging.size.toDouble / numberOfSimulations * 100}%")
+  println (s"Simulations converging to a norm (no committing): ${convergingNoCommitting.size.toDouble / numberOfSimulations * 100}%")
+  println (s"Simulations converging to a norm (committing): ${convergingCommitting.size.toDouble / numberOfSimulations * 100}%")
   // Print round that simulations first converged to norm, on average
-  println (s"Average round first converged: ${mean (converging.map (_._2.toDouble)).toInt} of $numberOfRounds")
+  println (s"Average round first converged (no committing): ${mean (convergingNoCommitting.map (_._2.toDouble)).toInt} of $numberOfRounds")
+  println (s"Average round first converged (committing): ${mean (convergingCommitting.map (_._2.toDouble)).toInt} of $numberOfRounds")
   // Print cumulative utility for whole simulation duration, averaged over all simulations
-  println (s"Total cumulative utility: ${mean (record.map (result => cumulativeUtility (result, 0, numberOfRounds)))}")
+  println (s"Total cumulative utility (no committing): ${mean (recordNoCommitting.map (result => cumulativeUtility (result, 0, numberOfRounds)))}")
+  println (s"Total cumulative utility (committing): ${mean (recordCommitting.map (result => cumulativeUtility (result, 0, numberOfRounds)))}")
   // Print cumulative utility for whole simulation duration prior to convergence, averaged over all converging simulations
-  println (s"Cumulative utility prior to convergence: ${mean (converging.map (result => cumulativeUtility (result._1, 0, result._2)))}")
+  println (s"Cumulative utility prior to convergence (no committing): ${mean (convergingNoCommitting.map (result => cumulativeUtility (result._1, 0, result._2)))}")
+  println (s"Cumulative utility prior to convergence (committing): ${mean (convergingCommitting.map (result => cumulativeUtility (result._1, 0, result._2)))}")
   // Print cumulative utility for whole simulation duration after convergence, averaged over all converging simulations
-  println (s"Cumulative utility after convergence: ${mean (converging.map (result => cumulativeUtility (result._1, result._2, numberOfRounds)))}")
+  println (s"Cumulative utility after convergence (no committing): ${mean (convergingNoCommitting.map (result => cumulativeUtility (result._1, result._2, numberOfRounds)))}")
+  println (s"Cumulative utility after convergence (committing): ${mean (convergingCommitting.map (result => cumulativeUtility (result._1, result._2, numberOfRounds)))}")
 }
 

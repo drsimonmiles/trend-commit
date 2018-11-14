@@ -66,7 +66,7 @@ object ConfigurationA extends Configuration (
   explorationProbability = 0.01,
   copyFrequency = 1,
   absoluteCoordinationCost = true,
-  numberOfRounds = 200,
+  numberOfRounds = 2000,
   numberOfSimulations = 1,  //100
   convergencePercentage = 0.95,
   proposalIterations = 5,
