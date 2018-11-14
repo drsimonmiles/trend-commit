@@ -1,6 +1,7 @@
 import co.theasi.plotly._
 import Networks._
 import Simulation._
+import Utilities._
 
 object Logging {
   // Regular output
@@ -63,7 +64,7 @@ object Logging {
     "Final strategy distribution per simulation:\n" +
     records.map (r => strategyCounts (r.strategies.last).map (s => s"${s._1}: ${s._2}").mkString ("{", ", ", "}")).mkString ("\n")
 
-  def logObservedStrategyUtilitiesPerRound (records: Vector[SimulationRecord], openingRounds: Int, closingRounds: Int, numberOfRounds: Int, agents: Vector[Agent]): String = {
+  /*def logObservedStrategyUtilitiesPerRound (records: Vector[SimulationRecord], openingRounds: Int, closingRounds: Int, numberOfRounds: Int, agents: Vector[Agent]): String = {
     def observedUtilitiesInRound (record: SimulationRecord, round: Int): Vector[Map[Action, Vector[Double]]] =
       record.interactions match {
         case None => Vector.empty
@@ -104,7 +105,7 @@ object Logging {
       logObservedStrategyUtilitiesInRoundRange (records, 0, openingRounds - 1) +
       "\n...\n" +
       logObservedStrategyUtilitiesInRoundRange (records, numberOfRounds - closingRounds, numberOfRounds - 1)
-  }
+  }*/
 
   // Extreme logging
   def logNetwork (network: Vector[(Agent, Agent)]): String =

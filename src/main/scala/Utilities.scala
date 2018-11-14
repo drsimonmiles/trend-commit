@@ -1,6 +1,11 @@
 import scala.util.Random.{nextInt => randomInt}
 
 object Utilities {
+  // Calculate the mean average of a list of values
+  def mean (values: Vector[Double]): Double =
+    values.sum / values.size
+
+  // Choose a random value from a vector
   def randomChoice[A] (collection: Vector[A]): A =
     collection (randomInt (collection.size))
 

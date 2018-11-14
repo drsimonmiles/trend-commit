@@ -25,7 +25,6 @@ case class Configuration ( // Network generation parameters
                            // Simulation parameters
                            numberOfRounds: Int,
                            numberOfSimulations: Int,
-                           convergencePercentage: Double,
                            loggingLevel: LoggingLevel
                          ) {
   val extremeLog: Boolean = loggingLevel == ExtremeLogging
@@ -68,7 +67,6 @@ object ConfigurationA extends Configuration (
   absoluteCoordinationCost = true,
   numberOfRounds = 2000,
   numberOfSimulations = 1,  //100
-  convergencePercentage = 0.95,
   proposalIterations = 5,
   loggingLevel = NoLogging
 )
@@ -97,7 +95,6 @@ object ConfigurationB extends Configuration (
   absoluteCoordinationCost = true,
   numberOfRounds = 10000,
   numberOfSimulations = 1,
-  convergencePercentage = 0.95,
   proposalIterations = 5,
   loggingLevel = SimulationLogging
 )
@@ -116,7 +113,6 @@ object ConfigurationC extends Configuration (
   absoluteCoordinationCost = true,
   numberOfRounds = 10,
   numberOfSimulations = 1,
-  convergencePercentage = 0.95,
   proposalIterations = 5,
   loggingLevel = ExtremeLogging
 )
