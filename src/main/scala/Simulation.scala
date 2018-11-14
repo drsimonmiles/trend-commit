@@ -85,8 +85,8 @@ object Simulation {
     proposals.createMap (strategy => actionReward (agent)(strategy))
 
   // Perform one simulation of the above defined environment
-  def simulate (committing: Boolean, configuration: Configuration, agents: Vector[Agent], neighbours: Map[Agent, Vector[Agent]],
-                actionReward: Map[Agent, Map[Action, Double]], coordinationReward: Map[(Action, Action), Double]): SimulationRecord = {
+  def simulateOnce (committing: Boolean, configuration: Configuration, agents: Vector[Agent], neighbours: Map[Agent, Vector[Agent]],
+                    actionReward: Map[Agent, Map[Action, Double]], coordinationReward: Map[(Action, Action), Double]): SimulationRecord = {
     import configuration._
 
     // Simulate from the given round until numberOfRounds, given the current strategy of each agent, the interaction
@@ -173,7 +173,7 @@ object Simulation {
     // Initial strategy of each agent, random actions
     val initialStrategy: Map[Agent, Action] = agents.createMap (agent => randomAction (numberOfActions))
     // Simulate from round 0, starting with no interaction history and an empty simulation record
-    simulateFromRound (round = 0, initialStrategy, Vector.empty, agents.createMap (_ => 0), committing,
+    simulateFromRound (round = 0, initialStrategy, Vector.empty, agents.createMap (_ => 0), mutualCommit,
       emptySimulationRecord (initialStrategy, configuration))
   }
 
@@ -210,24 +210,9 @@ object Simulation {
 
     if (aggregateLog) println (logCoordinationRewards (coordinationReward, actions) + "\n")
 
-    // Run a set of simulations in parallel, capture the results
-    val recordNoCommitting: Vector[SimulationRecord] =
-      (0 until numberOfSimulations).par.map { _ => simulate (committing = false, configuration, agents, neighbours, actionReward, coordinationReward) }.seq.toVector
-    //val recordCommitting: Vector[SimulationRecord] =
-    //  (0 until numberOfSimulations).par.map { _ => simulate (committing = true, configuration, agents, neighbours, actionReward, coordinationReward) }.seq.toVector
-
-    recordNoCommitting
+    // Run a set of simulations in parallel, return the results
+    (0 until numberOfSimulations).par.map { _ =>
+      simulateOnce (committing = mutualCommit, configuration, agents, neighbours, actionReward, coordinationReward) }.seq.toVector
   }
-
-  //plotConvergence (record)
-
-/*  if (aggregateLog) {
-    println (logTopStrategiesPerRound (recordNoCommitting, 5, 5, numberOfRounds) + "\n")
-    //println (logObservedStrategyUtilitiesPerRound (recordNoCommitting, 5, 5, numberOfRounds, agents) + "\n")
-    println (logFinalStrategyDistribution (recordNoCommitting) + "\n")
-  }
-
-
-*/
 }
 

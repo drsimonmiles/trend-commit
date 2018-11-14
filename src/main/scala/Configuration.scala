@@ -22,6 +22,7 @@ case class Configuration ( // Network generation parameters
                            copyFrequency: Int, // How many rounds between agents copying each others' best strategies
                            proposalIterations: Int, // Number of re-evaluations of best strategy producing the same strategy before proposing it as mutual commitment
                            explorationProbability: Double, // Likelihood of an agent trying a random action for a round
+                           mutualCommit: Boolean, // Is mutual commitment turned on?
                            // Simulation parameters
                            numberOfRounds: Int,
                            numberOfSimulations: Int,
@@ -35,6 +36,15 @@ case class Configuration ( // Network generation parameters
     if (extremeLog) println (logger (a))
     a
   }
+
+  override def toString: String =
+    s"${if (mutualCommit) "mutual commit" else "no mutual commit"}, " +
+      s"$numberOfAgents agents, $numberOfActions actions, $networkType, $numberOfRounds rounds, $minActionReward min action reward, " +
+      s"${if (absoluteCoordinationCost) "absolute coordination" else "weighted coordination"}, " +
+      s"$interactionsInstigatedPerRound interactions per round, copy strategies every $copyFrequency rounds, " +
+      s"${explorationProbability * 100}% exploration probability, " +
+      s"${if (mutualCommit) s"propose each $proposalIterations iterations, "}" +
+      s"$numberOfSimulations simulations"
 }
 
 /**
@@ -65,7 +75,8 @@ object ConfigurationA extends Configuration (
   explorationProbability = 0.01,
   copyFrequency = 1,
   absoluteCoordinationCost = true,
-  numberOfRounds = 2000,
+  mutualCommit = false,
+  numberOfRounds = 200,
   numberOfSimulations = 1,  //100
   proposalIterations = 5,
   loggingLevel = NoLogging
@@ -93,6 +104,7 @@ object ConfigurationB extends Configuration (
   explorationProbability = 0.1,
   copyFrequency = 5,
   absoluteCoordinationCost = true,
+  mutualCommit = false,
   numberOfRounds = 10000,
   numberOfSimulations = 1,
   proposalIterations = 5,
@@ -111,6 +123,7 @@ object ConfigurationC extends Configuration (
   explorationProbability = 0.01,
   copyFrequency = 1,
   absoluteCoordinationCost = true,
+  mutualCommit = false,
   numberOfRounds = 10,
   numberOfSimulations = 1,
   proposalIterations = 5,

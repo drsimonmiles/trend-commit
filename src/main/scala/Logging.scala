@@ -1,6 +1,5 @@
 import co.theasi.plotly._
 import Networks._
-import Simulation._
 import Utilities._
 
 object Logging {
