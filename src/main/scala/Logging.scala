@@ -3,6 +3,18 @@ import Networks._
 import Simulation._
 
 object Logging {
+  // Regular output
+  def plotConvergence (records: Vector[SimulationRecord]): Unit = {
+    val config = records.head.configuration
+    val xs = 0 until config.numberOfRounds
+    val ys = xs.map (round =>
+      mean (records.map (_.strategies (round).count (_ == Action (0)).toDouble / config.numberOfAgents)))
+    val plot = Plot ().withScatter (xs, ys)
+
+    draw (plot, s"Ac0 agents (${config.networkType} ${config.copyFrequency}-${config.absoluteCoordinationCost})")
+  }
+
+  // Aggregate-level logging
   def populationRewards (rewards: Map[Agent, Map[Action, Double]]): Map[Action, Double] =
     rewards.values.flatten.groupBy (_._1).mapValues (_.foldLeft (0.0)((sum, reward) => sum + reward._2))
 
@@ -11,8 +23,8 @@ object Logging {
       populationRewards (rewards).toVector.sortBy (_._2).reverse.map (r => f"${r._1}: ${r._2}%1.0f").mkString ("Ordered by reward: ", ", ", "")
 
   def logCoordinationRewards (matrix: Map[(Action, Action), Double], actions: Vector[Action]): String =
-    "Coordination reward matrix:\n" +
-      (for (row <- actions) yield
+    "Coordination reward matrix:\n" + actions.mkString ("     ", " ", "\n") +
+      (for (row <- actions) yield s"${row.toString} " +
         (for (col <- actions) yield
           f"${matrix ((row, col))}%1.1f").mkString (" ")).mkString ("\n")
 
@@ -63,7 +75,7 @@ object Logging {
       record.interactions match {
         case None => Vector.empty
         case Some (allInteractions) =>
-          agents.map (agent => bestStrategy (observedInteractions (agent, allInteractions (round))))
+          agents.map (agent => bestStrategy (strategyRatings (observedInteractions (agent, allInteractions (round)))))
       }
 
     def mergeObservedStrategyUtilities (utilities: Vector[Map[Action, Vector[Double]]]): Map[Action, Double] = {
@@ -94,11 +106,40 @@ object Logging {
       logObservedStrategyUtilitiesInRoundRange (records, numberOfRounds - closingRounds, numberOfRounds - 1)
   }
 
-  def plotConvergence (record: SimulationRecord): Unit = {
-    val xs = record.strategies.indices
-    val ys = record.strategies.map (_.count (_ == Action (0)).toDouble / record.configuration.numberOfAgents)
-    val plot = Plot ().withScatter (xs, ys)
+  // Extreme logging
+  def logNetwork (network: Vector[(Agent, Agent)]): String =
+    nodes (network).map (node => s"$node: ${connected (node, network).mkString (", ")}").mkString ("Network:\n", "\n", "")
 
-    draw (plot, s"Proportion of agents using strategy 0 (${record.configuration.networkType})")
-  }
+  def logActionRewards (rewards: Map[Agent, Map[Action, Double]]): String =
+    rewards.map (r => s"${r._1} -> ${r._2.map (a => s"${a._1}: ${a._2}").mkString (", ")}").mkString ("Action reward vectors:\n", "\n", "")
+
+  def logActionsChosen (choices: Map[Agent, Action]): String =
+    choices.map (c => c._1 + ": " + c._2).mkString ("Action choices: ", ", ", "")
+
+  def logInteractions (interactions: Vector[InteractionRecord]): String =
+    interactions.mkString ("Round interactions:\n", "\n", "")
+
+  def logHistory (history: Vector[Vector[InteractionRecord]]): String =
+    history.map (_.mkString ("[", ",", "]")).mkString ("Interaction memory:\n", "\n", "")
+
+  def logFlatHistory (history: Vector[InteractionRecord]): String =
+    history.mkString ("Flattened history: [", ",", "]")
+
+  def logObservedHistory (history: Map[Agent, Vector[InteractionRecord]]): String =
+    history.map (h => h._1 + ": " + h._2.mkString ("[", ",", "]")).mkString ("History observed by agent:\n", "\n", "")
+
+  def logActionRatings (ratings: Map[Agent, Map[Action, Double]]): String =
+    ratings.map (r => r._1 + ": " + r._2.map (a => s"${a._1}=${a._2}").mkString (", ")).mkString ("Ratings:\n", "\n", "")
+
+  def logStrategyChosen (choices: Map[Agent, Action]): String =
+    choices.map (c => c._1 + ": " + c._2).mkString ("Best strategy copied: ", ", ", "")
+
+  def simulationRecordToString (record: SimulationRecord): String =
+    record.initialStrategies.mkString ("Initial strategies: ", ", ", "\n") +
+      record.strategies.indices.map (round =>
+        s"$round => utility: ${record.roundUtility (round)}, strategies: ${record.strategies (round).mkString ("{", ",", "}")}"
+      ).mkString ("\n")
+
+  def logAggregatedResults (record: SimulationRecord): String =
+    "Results after aggregation:\n" + simulationRecordToString (record)
 }

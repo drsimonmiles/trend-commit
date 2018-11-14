@@ -1,31 +1,29 @@
-import scala.util.Random.{nextDouble => randomDouble, nextInt => randomInt, shuffle}
+import scala.util.Random.{shuffle, nextDouble => randomDouble, nextInt => randomInt}
+import Utilities._
 
 object Simulation extends App {
   import Networks._
   import Logging._
 
-  val configuration = ConfigurationB
-  val debug = true
+  val configuration = ConfigurationA
 
   import configuration._
 
   // Neighbourhood links between agents
-  val network: Vector[(Agent, Agent)] = networkType match {
+  val network: Vector[(Agent, Agent)] = logIfExtreme (logNetwork) (networkType match {
     case SmallWorldNetwork => smallWorldNetwork (numberOfAgents, averageDegree, nonLatticeProbability)
     case ScaleFreeNetwork => scaleFreeNetwork (numberOfAgents)
     case FullyConnectedNetwork => fullyConnectedNetwork (numberOfAgents)
-  }
+  })
   // List of agents in network
   val agents: Vector[Agent] =
     nodes (network)
   // Map of each agent to a list of its neighbours
   val neighbours: Map[Agent, Vector[Agent]] =
-    agents.map (agent => agent -> connected (agent, network)).toMap
+    agents.createMap (agent => connected (agent, network))
   // Choose a random neighbour of the given agent
-  def randomNeighbour (agent: Agent): Agent = {
-    val neighbourhood = neighbours (agent)
-    neighbourhood (randomInt (neighbourhood.size))
-  }
+  def randomNeighbour (agent: Agent): Agent =
+    randomChoice (neighbours (agent))
 
   // An action, represented by its ID
   case class Action (id: Int) extends AnyVal {
@@ -37,16 +35,17 @@ object Simulation extends App {
   // Get a random possible action
   def randomAction: Action =
     Action (randomInt (numberOfActions))
-  // Create an agent's reward vector where the utility of the given ideal action is 1.0 tailoring linearly to 0.0
+  // Create an agent's reward vector where the utility of the given ideal action is 1.0 tailoring linearly to minActionReward
   //   on either side
   def actionRewardVector (ideal: Action): Map[Action, Double] =
-    actions.map (action =>
-      action -> (1.0 + (if (action.id >= ideal.id) ideal.id - action.id else action.id - ideal.id) * 2.0 / numberOfActions).max (0.0)).toMap
+    actions.createMap (action =>
+      (1.0 + (if (action.id >= ideal.id) ideal.id - action.id else action.id - ideal.id) * 2.0 / numberOfActions).max (minActionReward))
   // Map of each agent to its action reward vector
-  val actionReward: Map[Agent, Map[Action, Double]] =
-    agents.map (agent => agent -> actionRewardVector (Action (randomInt (numberOfActions)))).toMap
+  val actionReward: Map[Agent, Map[Action, Double]] = logIfExtreme (logActionRewards) (
+    agents.createMap (agent => actionRewardVector (Action (randomInt (numberOfActions))))
+  )
 
-  if (debug) println (logPopulationRewards (actionReward) + "\n")
+  if (aggregateLog) println (logPopulationRewards (actionReward) + "\n")
 
   // The function returning the coordination matrix value given the distance from the main diagonal,
   //   distance varies from 0.0 on the diagonal to 1.0 at the extreme corners
@@ -62,18 +61,21 @@ object Simulation extends App {
       (x, y) -> miscoordination (distance)
     }).toMap
 
-  if (debug) println (logCoordinationRewards (coordinationReward, actions) + "\n")
+  if (aggregateLog) println (logCoordinationRewards (coordinationReward, actions) + "\n")
 
   // Calculate one agent's reward from an interaction between itself and another agent, each performing given actions
   def interactionReward (agent: Agent, action: Action, othersAction: Action): Double =
     actionReward (agent)(action) * coordinationReward (action, othersAction)
   // A record of the interaction between two agents, giving their actions and the instigator's reward
-  case class InteractionRecord (instigatorAgent: Agent, receiverAgent: Agent,
+  case class InteractionRecord (round: Int, instigatorAgent: Agent, receiverAgent: Agent,
                                 instigatorAction: Action, receiverAction: Action,
-                                instigatorReward: Double, receiverReward: Double)
+                                instigatorReward: Double, receiverReward: Double) {
+    override def toString =
+      s"$round: [$instigatorAgent:$instigatorAction]($instigatorReward) <=> [$receiverAgent:$receiverAction]($receiverReward)"
+  }
   // Execute an interaction between two agents performing actions, returning the interaction record
-  def interact (instigatorAgent: Agent, receiverAgent: Agent, instigatorAction: Action, receiverAction: Action): InteractionRecord =
-    InteractionRecord (instigatorAgent, receiverAgent, instigatorAction, receiverAction,
+  def interact (round: Int, instigatorAgent: Agent, receiverAgent: Agent, instigatorAction: Action, receiverAction: Action): InteractionRecord =
+    InteractionRecord (round, instigatorAgent, receiverAgent, instigatorAction, receiverAction,
       interactionReward (instigatorAgent, instigatorAction, receiverAction),
       interactionReward (receiverAgent, receiverAction, instigatorAction))
 
@@ -95,12 +97,14 @@ object Simulation extends App {
   // Return the mean average reward received from each action by agents in the interaction set
   def strategyRatings (records: Vector[InteractionRecord]): Map[Action, Double] =
     actionRewards (records).mapValues (mean)
-  // Return the action producing the best average reward as recorded in the given interaction records
-  def bestStrategy (records: Vector[InteractionRecord]): Action = {
-    val best = shuffle (strategyRatings (records).toVector).maxBy (_._2)._1
-//    if (strategyRatings (records)(best) > 0.0) println (best + " <- " + records)
-    best
-  }
+  // Return the action producing the best average reward as recorded in the given interaction records,
+  //   shuffling records first so that if records all have the same utility, different ones are picked each time
+  def bestStrategy (ratings: Map[Action, Double]): Action =
+    shuffle (ratings.toVector).maxBy (_._2)._1
+
+  // Evaluate the average reward this agent would receive if the population committed to each of the proposed strategies
+  def proposalEvaluations (agent: Agent, proposals: Vector[Action]): Map[Action, Double] =
+    proposals.createMap (strategy => actionReward (agent)(strategy))
 
   // The log of results of the simulation, aggregated as we go along to conserve memory
   // The structure of this log can be changed as new outputs are required
@@ -112,7 +116,7 @@ object Simulation extends App {
   // This can be adjusted if SimulationRecord is changed to add new fields
   def emptySimulationRecord (initialStrategies: Map[Agent, Action]): SimulationRecord =
     SimulationRecord (configuration, initialStrategies.valuesIterator.toVector, Vector.empty, Vector.empty,
-      if (debug) Some (Vector.empty) else None)
+      if (aggregateLog) Some (Vector.empty) else None)
   // Aggregates the full data from a round into the running simulation record, given the strategy per agent that round
   //  and records of all interactions that round
   // The strategy parameter is a mapping of agents to their strategies this round
@@ -126,52 +130,100 @@ object Simulation extends App {
       interactions = previous.interactions.map (_ :+ roundInteractions))
 
   // Simulate from the given round until numberOfRounds, given the current strategy of each agent, the interaction
-  // history within the memory window, and the running results, and returning the completed simulation results.
+  // history within the memory window, number of re-evaluations maintaining the same strategy, and the running results,
+  // and returning the completed simulation results.
   def simulateFromRound (round: Int, strategy: Map[Agent, Action], history: Vector[Vector[InteractionRecord]],
-                         results: SimulationRecord): SimulationRecord = {
+                         consistency: Map[Agent, Int], committing: Boolean, results: SimulationRecord): SimulationRecord = {
     if (round == numberOfRounds) results
     else {
-      // Map agents to the action they perform this round, either their strategy or a random exploration
-      val roundAction = agents.map (agent => agent ->
-        (if (randomDouble < explorationProbability) randomAction else strategy (agent))).toMap
+      if (extremeLog) println (s"Round $round")
+      // Map agents to the action they perform this round, either their strategy or a random exploration if not last round
+      val roundAction = logIfExtreme (logActionsChosen) (agents.createMap (agent =>
+        if (round < numberOfRounds - 1 && randomDouble < explorationProbability) randomAction else strategy (agent)))
       // Perform interactions by all agents for this round, returning the interaction records
-      val interactions: Vector[InteractionRecord] =
+      val interactions: Vector[InteractionRecord] = logIfExtreme (logInteractions) (
         for (instigator <- agents; _ <- 1 to interactionsInstigatedPerRound) yield {
           val receiver = randomNeighbour (instigator)
-          interact (instigator, receiver, roundAction (instigator), roundAction (receiver))
-        }
+          interact (round, instigator, receiver, roundAction (instigator), roundAction (receiver))
+        })
       // Add the current round interaction records to the history, removing the oldest
-      val newHistory = interactions +: (if (history.size < copyFrequency) history else history.init)
-      // Every copyFrequency rounds, each agent copies the best strategy in the interactions they've observed
-      val newStrategy = if (round % copyFrequency == 0) {
-        // Get the history of interaction records as a single set, rather than per round
-        val allHistory = newHistory.flatten
-        // Set the strategy for each agent to be the best of those they've observed from the remembered history
-        agents.map (agent => agent -> bestStrategy (observedInteractions (agent, allHistory))).toMap
-        //strategyRatingsForDebug (observedInteractions (agent, allHistory))
-      } else strategy
-      // Aggregate the round's results into the running results object
-      val newResults = aggregateRoundResults (results, strategy, interactions)
+      val newHistory: Vector[Vector[InteractionRecord]] = logIfExtreme (logHistory) (
+        interactions +: (if (history.size < copyFrequency) history else history.init)
+      )
+      // Each agent calculates the best strategy in the interactions they've observed
+      if (extremeLog) println ("Choosing new strategies")
+      // Get the history of interaction records as a single set, rather than per round
+      val allHistory: Vector[InteractionRecord] =
+        logIfExtreme (logFlatHistory) (newHistory.flatten)
+      // Get the interactions each agent observed within the history
+      val observedHistory: Map[Agent, Vector[InteractionRecord]] =
+        logIfExtreme (logObservedHistory) (
+          agents.createMap (agent => observedInteractions (agent, allHistory)))
+      val ratingPerAction: Map[Agent, Map[Action, Double]] =
+        logIfExtreme (logActionRatings) (
+          agents.createMap (agent => strategyRatings (observedHistory (agent))))
+      // Get the strategy for each agent that is the best of those they've observed from the remembered history
+      val bestObservedStrategy: Map[Agent, Action] =
+        logIfExtreme (logStrategyChosen) (agents.createMap (agent => bestStrategy (ratingPerAction (agent))))
 
-      simulateFromRound (round + 1, newStrategy, newHistory, newResults)
+      // Calculate for how many strategy re-evaluation points each agent has now kept the same strategy
+      val newConsistency: Map[Agent, Int] =
+        if (round % copyFrequency == 0) {
+          consistency.transformValues ((agent, count) =>
+            if (bestObservedStrategy (agent) == strategy (agent)) count + 1 else 0)
+        } else consistency
+
+      // The list of strategies to propose for mutual commitment
+      val proposals: Vector[Action] = if (committing && round % copyFrequency == 0) {
+        newConsistency.filter (a => a._2 == proposalIterations).map (a => strategy (a._1)).toVector
+      } else Vector.empty
+      // Each agent's evaluation of the value of each proposal
+      val evaluations: Map[Agent, Map[Action, Double]] =
+        agents.createMap (agent => proposalEvaluations (agent, proposals))
+      // Map each agent to the actions it would vote in favour of committing to
+      val inFavour: Map[Agent, Set[Action]] =
+        evaluations.transformValues ((agent, values) =>
+        values.filter (eval => eval._2 > ratingPerAction (agent)(eval._1)).keySet)
+      // Map each proposal to the number of votes cast
+      val votes: Map[Action, Int] =
+        proposals.createMap (proposal => inFavour.count (a => a._2.contains (proposal)))
+      // A proposal winning over half the votes, if any
+      val winner: Option[Action] =
+        shuffle (votes.filter (_._2 > numberOfAgents / 2).keys.toVector).headOption
+
+      // If there is a winning proposal, all strategies change to that.
+      // Else every copyFrequenct rounds, each agent copies the best observed strategy.
+      val newStrategy = winner match {
+        case Some (commitment) => strategy.mapValues (_ => commitment)
+        case None => if (round % copyFrequency == 0) bestObservedStrategy else strategy
+      }
+
+
+      // Aggregate the round's results into the running results object
+      val newResults = logIfExtreme (logAggregatedResults) (
+        aggregateRoundResults (results, strategy, interactions)
+      )
+
+      simulateFromRound (round + 1, newStrategy, newHistory, newConsistency, committing, newResults)
     }
   }
 
   // Perform one simulation of the above defined environment
   def simulate (): SimulationRecord = {
     // Initial strategy of each agent, random actions
-    val initialStrategy: Map[Agent, Action] = agents.map (agent => agent -> randomAction).toMap
+    val initialStrategy: Map[Agent, Action] = agents.createMap (agent => randomAction)
     // Simulate from round 0, starting with no interaction history and an empty simulation record
-    simulateFromRound (round = 0, initialStrategy, Vector.empty, emptySimulationRecord (initialStrategy))
+    simulateFromRound (round = 0, initialStrategy, Vector.empty, agents.createMap (_ => 0), committing = false,
+      emptySimulationRecord (initialStrategy))
   }
 
   // Run a set of simulations in parallel, capture the results
   val record: Vector[SimulationRecord] =
     (0 until numberOfSimulations).par.map {_ => simulate ()}.seq.toVector
 
-  plotConvergence (record.head)
+  //plotConvergence (record)
 
-  if (debug) {
+  if (aggregateLog) {
     println (logTopStrategiesPerRound (record, 5, 5, numberOfRounds) + "\n")
     println (logObservedStrategyUtilitiesPerRound (record, 5, 5, numberOfRounds, agents) + "\n")
     println (logFinalStrategyDistribution (record) + "\n")
@@ -192,16 +244,10 @@ object Simulation extends App {
   def cumulativeUtility (results: SimulationRecord, from: Int, until: Int): Double =
     results.roundUtility.slice (from, until).sum
 
-  // Temporary logging for debugging
-//  println (record.head.strategies.last.take (50))
-//  println (record.head.strategies.last.distinct)
-//  println (record.head.strategies.last.distinct.map (n => record.head.strategies.last.count (_ == n)).sorted.reverse)
-//  println (record.head.strategies.last.distinct.map (n => record.head.strategies.last.count (_ == n).toDouble / record.head.strategies.last.size).sorted.reverse)
-
   // Print percentage of simulations that converged to a norm
   println (s"Simulations converging to a norm: ${converging.size.toDouble / numberOfSimulations * 100}%")
   // Print round that simulations first converged to norm, on average
-  println (s"Round first converged: ${mean (converging.map (_._2.toDouble))}")
+  println (s"Average round first converged: ${mean (converging.map (_._2.toDouble)).toInt} of $numberOfRounds")
   // Print cumulative utility for whole simulation duration, averaged over all simulations
   println (s"Total cumulative utility: ${mean (record.map (result => cumulativeUtility (result, 0, numberOfRounds)))}")
   // Print cumulative utility for whole simulation duration prior to convergence, averaged over all converging simulations
