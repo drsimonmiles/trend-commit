@@ -67,7 +67,7 @@ object ConfigurationA extends Configuration (
   copyFrequency = 1,
   absoluteCoordinationCost = true,
   numberOfRounds = 200,
-  numberOfSimulations = 100,
+  numberOfSimulations = 1,  //100
   convergencePercentage = 0.95,
   proposalIterations = 5,
   loggingLevel = NoLogging

@@ -103,7 +103,7 @@ object Simulation extends App {
     shuffle (ratings.toVector).maxBy (_._2)._1
 
   // Evaluate the average reward this agent would receive if the population committed to each of the proposed strategies
-  def proposalEvaluations (agent: Agent, proposals: Vector[Action]): Map[Action, Double] =
+  def proposalEvaluations (agent: Agent, proposals: Set[Action]): Map[Action, Double] =
     proposals.createMap (strategy => actionReward (agent)(strategy))
 
   // The log of results of the simulation, aggregated as we go along to conserve memory
@@ -173,23 +173,26 @@ object Simulation extends App {
             if (bestObservedStrategy (agent) == strategy (agent)) count + 1 else 0)
         } else consistency
 
-      // The list of strategies to propose for mutual commitment
-      val proposals: Vector[Action] = if (committing && round % copyFrequency == 0) {
-        newConsistency.filter (a => a._2 == proposalIterations).map (a => strategy (a._1)).toVector
-      } else Vector.empty
+      // The set of strategies to propose for mutual commitment
+      val proposals: Set[Action] = if (committing && round % copyFrequency == 0) {
+        newConsistency.filter (a => a._2 == proposalIterations).map (a => strategy (a._1)).toSet
+      } else Set.empty
+      if (proposals.nonEmpty) println (s"Proposals: $proposals")
       // Each agent's evaluation of the value of each proposal
       val evaluations: Map[Agent, Map[Action, Double]] =
         agents.createMap (agent => proposalEvaluations (agent, proposals))
       // Map each agent to the actions it would vote in favour of committing to
       val inFavour: Map[Agent, Set[Action]] =
         evaluations.transformValues ((agent, values) =>
-        values.filter (eval => eval._2 > ratingPerAction (agent)(eval._1)).keySet)
+        values.filter (eval => eval._2 > ratingPerAction (agent).getOrElse (eval._1, 0.0)).keySet)
       // Map each proposal to the number of votes cast
       val votes: Map[Action, Int] =
         proposals.createMap (proposal => inFavour.count (a => a._2.contains (proposal)))
+      if (votes.nonEmpty) println (s"Votes: $votes")
       // A proposal winning over half the votes, if any
       val winner: Option[Action] =
         shuffle (votes.filter (_._2 > numberOfAgents / 2).keys.toVector).headOption
+      if (winner.nonEmpty) println (s"Winner: ${winner.get}")
 
       // If there is a winning proposal, all strategies change to that.
       // Else every copyFrequenct rounds, each agent copies the best observed strategy.
@@ -197,7 +200,6 @@ object Simulation extends App {
         case Some (commitment) => strategy.mapValues (_ => commitment)
         case None => if (round % copyFrequency == 0) bestObservedStrategy else strategy
       }
-
 
       // Aggregate the round's results into the running results object
       val newResults = logIfExtreme (logAggregatedResults) (
@@ -213,7 +215,7 @@ object Simulation extends App {
     // Initial strategy of each agent, random actions
     val initialStrategy: Map[Agent, Action] = agents.createMap (agent => randomAction)
     // Simulate from round 0, starting with no interaction history and an empty simulation record
-    simulateFromRound (round = 0, initialStrategy, Vector.empty, agents.createMap (_ => 0), committing = false,
+    simulateFromRound (round = 0, initialStrategy, Vector.empty, agents.createMap (_ => 0), committing = true,
       emptySimulationRecord (initialStrategy))
   }
 

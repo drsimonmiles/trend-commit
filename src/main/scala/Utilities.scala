@@ -4,7 +4,7 @@ object Utilities {
   def randomChoice[A] (collection: Vector[A]): A =
     collection (randomInt (collection.size))
 
-  implicit class VectorExtensions[A] (vector: Vector[A]) {
+  implicit class CollectionExtensions[A] (vector: Iterable[A]) {
     def createMap[B] (f: A => B): Map[A, B] =
       vector.map (e => (e, f (e))).toMap
   }
