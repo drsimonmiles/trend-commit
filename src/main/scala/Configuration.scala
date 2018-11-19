@@ -9,6 +9,10 @@ case object AggregateLogging extends LoggingLevel
 case object SimulationLogging extends LoggingLevel
 case object ExtremeLogging extends LoggingLevel
 
+object FixedConfiguration {
+  val convergencePercentage = 0.95
+}
+
 case class Configuration ( // Network generation parameters
                            numberOfAgents: Int,
                            networkType: NetworkType, // small world, scale-free, or fully connected

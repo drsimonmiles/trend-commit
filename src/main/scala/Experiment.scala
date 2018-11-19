@@ -11,11 +11,14 @@ object Experiment {
     else configSequence (zero, nextInSeries, stopAtInSeries) +:
       configMultiSequence (nextSeries (zero), nextSeries, stopAtSeries, nextInSeries, stopAtInSeries)
 
-  def generateSeries (configurations: Vector[Configuration]): Map[Configuration, AggregateRecord] =
-    configurations.createMap (simulate)
+  def generateSeries (configurations: Vector[Configuration]): Vector[AggregateRecord] =
+    configurations.map (simulate)
 
-  def generateMultiSeries (configurations: Vector[Vector[Configuration]]): Vector[Map[Configuration, AggregateRecord]] =
-    configurations.map (_.createMap (simulate))
+  def generateMultiSeries (configurations: Vector[Vector[Configuration]]): Vector[Vector[AggregateRecord]] =
+    configurations.map (_.map (simulate))
+
+  def compareSeries (series1: Vector[AggregateRecord], series2: Vector[AggregateRecord]): Vector[ComparativeRecord] =
+    series1.zip (series2).map (a => new ComparativeRecord (a._1, a._2))
 
   def multiSeriesToData[SeriesValue, XValue, YValue] (configs: Vector[Vector[Configuration]],
                                                       results: Vector[Map[Configuration, AggregateRecord]],

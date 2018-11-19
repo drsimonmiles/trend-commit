@@ -64,8 +64,8 @@ object Simulation {
 
   // The empty simulation record, to be added to as the simulation runs
   // This can be adjusted if SimulationRecord is changed to add new fields
-  def emptySimulationRecord (initialStrategies: Map[Agent, Action], configuration: Configuration): SimulationRecord =
-    SimulationRecord (configuration, initialStrategies.valuesIterator.toVector, Vector.empty, Vector.empty,
+  def emptySimulationRecord (initialStrategies: Map[Agent, Action], actionRewards: Map[Agent, Map[Action, Double]], configuration: Configuration): SimulationRecord =
+    SimulationRecord (initialStrategies.valuesIterator.toVector, actionRewards, Vector.empty, Vector.empty,
       if (configuration.aggregateLog) Some (Vector.empty) else None)
 
   // Aggregates the full data from a round into the running simulation record, given the strategy per agent that round
@@ -85,7 +85,7 @@ object Simulation {
     proposals.createMap (strategy => actionReward (agent)(strategy))
 
   // Perform one simulation of the above defined environment
-  def simulateOnce (committing: Boolean, configuration: Configuration, agents: Vector[Agent], neighbours: Map[Agent, Vector[Agent]],
+  def simulateOnce (configuration: Configuration, agents: Vector[Agent], neighbours: Map[Agent, Vector[Agent]],
                     actionReward: Map[Agent, Map[Action, Double]], coordinationReward: Map[(Action, Action), Double]): SimulationRecord = {
     import configuration._
 
@@ -93,7 +93,7 @@ object Simulation {
     // history within the memory window, number of re-evaluations maintaining the same strategy, and the running results,
     // and returning the completed simulation results.
     def simulateFromRound (round: Int, strategy: Map[Agent, Action], history: Vector[Vector[InteractionRecord]],
-                           consistency: Map[Agent, Int], committing: Boolean, results: SimulationRecord): SimulationRecord = {
+                           consistency: Map[Agent, Int], results: SimulationRecord): SimulationRecord = {
       if (round == numberOfRounds) results
       else {
         if (extremeLog) println (s"Round $round")
@@ -134,10 +134,9 @@ object Simulation {
           } else consistency
 
         // The set of strategies to propose for mutual commitment
-        val proposals: Set[Action] = if (committing && round % copyFrequency == 0) {
+        val proposals: Set[Action] = if (mutualCommit && round % copyFrequency == 0) {
           newConsistency.filter (a => a._2 == proposalIterations).map (a => strategy (a._1)).toSet
         } else Set.empty
-        //if (proposals.nonEmpty) println (s"Proposals: $proposals")
         // Each agent's evaluation of the value of each proposal
         val evaluations: Map[Agent, Map[Action, Double]] =
           agents.createMap (agent => proposalEvaluations (agent, proposals, actionReward))
@@ -148,11 +147,9 @@ object Simulation {
         // Map each proposal to the number of votes cast
         val votes: Map[Action, Int] =
           proposals.createMap (proposal => inFavour.count (a => a._2.contains (proposal)))
-        //if (votes.nonEmpty) println (s"Votes: $votes")
         // A proposal winning over half the votes, if any
         val winner: Option[Action] =
           shuffle (votes.filter (_._2 > numberOfAgents / 2).keys.toVector).headOption
-        if (winner.nonEmpty) println (s"Winner: ${winner.get}")
 
         // If there is a winning proposal, all strategies change to that.
         // Else every copyFrequenct rounds, each agent copies the best observed strategy.
@@ -166,15 +163,15 @@ object Simulation {
           aggregateRoundResults (results, strategy, interactions)
         )
 
-        simulateFromRound (round + 1, newStrategy, newHistory, newConsistency, committing, newResults)
+        simulateFromRound (round + 1, newStrategy, newHistory, newConsistency, newResults)
       }
     }
 
     // Initial strategy of each agent, random actions
     val initialStrategy: Map[Agent, Action] = agents.createMap (agent => randomAction (numberOfActions))
     // Simulate from round 0, starting with no interaction history and an empty simulation record
-    simulateFromRound (round = 0, initialStrategy, Vector.empty, agents.createMap (_ => 0), mutualCommit,
-      emptySimulationRecord (initialStrategy, configuration))
+    simulateFromRound (round = 0, initialStrategy, Vector.empty, agents.createMap (_ => 0),
+      emptySimulationRecord (initialStrategy, actionReward, configuration))
   }
 
   def simulate (configuration: Configuration): AggregateRecord = {
@@ -211,7 +208,8 @@ object Simulation {
     if (aggregateLog) println (logCoordinationRewards (coordinationReward, actions) + "\n")
 
     // Run a set of simulations in parallel, return the results
-    new AggregateRecord ((0 until numberOfSimulations).par.map { _ =>
-      simulateOnce (committing = mutualCommit, configuration, agents, neighbours, actionReward, coordinationReward) }.seq.toVector)
+    val runs = (0 until numberOfSimulations).par.map { _ =>
+      simulateOnce (configuration, agents, neighbours, actionReward, coordinationReward) }.seq.toVector
+    new AggregateRecord (configuration, runs)
   }
 }
