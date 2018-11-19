@@ -3,17 +3,6 @@ import Networks._
 import Utilities._
 
 object Logging {
-  // Regular output
-  def plotConvergence (records: Vector[SimulationRecord]): Unit = {
-    val config = records.head.configuration
-    val xs = 0 until config.numberOfRounds
-    val ys = xs.map (round =>
-      mean (records.map (_.strategies (round).count (_ == Action (0)).toDouble / config.numberOfAgents)))
-    val plot = Plot ().withScatter (xs, ys)
-
-    draw (plot, s"Ac0 agents (${config.networkType} ${config.copyFrequency}-${config.absoluteCoordinationCost})")
-  }
-
   // Aggregate-level logging
   def populationRewards (rewards: Map[Agent, Map[Action, Double]]): Map[Action, Double] =
     rewards.values.flatten.groupBy (_._1).mapValues (_.foldLeft (0.0)((sum, reward) => sum + reward._2))

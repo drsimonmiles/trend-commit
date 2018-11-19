@@ -137,7 +137,7 @@ object Simulation {
         val proposals: Set[Action] = if (committing && round % copyFrequency == 0) {
           newConsistency.filter (a => a._2 == proposalIterations).map (a => strategy (a._1)).toSet
         } else Set.empty
-        if (proposals.nonEmpty) println (s"Proposals: $proposals")
+        //if (proposals.nonEmpty) println (s"Proposals: $proposals")
         // Each agent's evaluation of the value of each proposal
         val evaluations: Map[Agent, Map[Action, Double]] =
           agents.createMap (agent => proposalEvaluations (agent, proposals, actionReward))
@@ -148,7 +148,7 @@ object Simulation {
         // Map each proposal to the number of votes cast
         val votes: Map[Action, Int] =
           proposals.createMap (proposal => inFavour.count (a => a._2.contains (proposal)))
-        if (votes.nonEmpty) println (s"Votes: $votes")
+        //if (votes.nonEmpty) println (s"Votes: $votes")
         // A proposal winning over half the votes, if any
         val winner: Option[Action] =
           shuffle (votes.filter (_._2 > numberOfAgents / 2).keys.toVector).headOption
@@ -177,7 +177,7 @@ object Simulation {
       emptySimulationRecord (initialStrategy, configuration))
   }
 
-  def simulate (configuration: Configuration): Vector[SimulationRecord] = {
+  def simulate (configuration: Configuration): AggregateRecord = {
     import configuration._
 
     // Neighbourhood links between agents
@@ -211,8 +211,7 @@ object Simulation {
     if (aggregateLog) println (logCoordinationRewards (coordinationReward, actions) + "\n")
 
     // Run a set of simulations in parallel, return the results
-    (0 until numberOfSimulations).par.map { _ =>
-      simulateOnce (committing = mutualCommit, configuration, agents, neighbours, actionReward, coordinationReward) }.seq.toVector
+    new AggregateRecord ((0 until numberOfSimulations).par.map { _ =>
+      simulateOnce (committing = mutualCommit, configuration, agents, neighbours, actionReward, coordinationReward) }.seq.toVector)
   }
 }
-

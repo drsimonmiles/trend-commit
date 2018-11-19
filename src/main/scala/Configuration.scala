@@ -70,14 +70,14 @@ object ConfigurationA extends Configuration (
   averageDegree = 4,
   nonLatticeProbability = 0.4,
   numberOfActions = 100,
-  minActionReward = 0.5,
+  minActionReward = 0.1,
   interactionsInstigatedPerRound = 1,
   explorationProbability = 0.01,
   copyFrequency = 1,
   absoluteCoordinationCost = true,
   mutualCommit = false,
   numberOfRounds = 200,
-  numberOfSimulations = 1,  //100
+  numberOfSimulations = 100,
   proposalIterations = 5,
   loggingLevel = NoLogging
 )
