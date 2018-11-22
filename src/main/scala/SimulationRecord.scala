@@ -53,7 +53,7 @@ case class SimulationRecord (initialStrategies: Vector[Action], actionRewards: M
 // The aggregated record of multiple simulation runs of the same configuration, with statistics on how these performed on average
 class AggregateRecord (val configuration: Configuration, val runs: Vector[SimulationRecord]) {
   // Generate a map of simulation records to the round where they first converged, excluding simulations that did not converge
-  val firstConvergesAt: Map[SimulationRecord, Int] = runs.createMap (_.firstConvergesAt).filter (_._2 == -1)
+  val firstConvergesAt: Map[SimulationRecord, Int] = runs.createMap (_.firstConvergesAt).filter (_._2 != -1)
   val proportionConverging: Double = firstConvergesAt.size.toDouble / runs.size
   val averageConvergeRound: Int = mean (firstConvergesAt.toVector.map (_._2.toDouble)).toInt
   val averageTotalUtility: Double = mean (runs.map (_.cumulativeUtility (None, None)))
@@ -66,12 +66,12 @@ class AggregateRecord (val configuration: Configuration, val runs: Vector[Simula
   def averageUtilityFromRound (round: Int): Double =
     mean (runs.map (_.cumulativeUtility (Some (round), None)))
 
-  override def toString: String =
+  override def toString: String = runs.map (_.firstConvergesAt).toString +
     s"Simulations converging to a norm: ${proportionConverging * 100}%\n" +
     s"Average round first converged: $averageConvergeRound\n" +
     s"Total cumulative utility: $averageTotalUtility\n" +
-    s"Cumulative utility prior to convergence:$averageUtilityBeforeConvergence\n" +
-    s"Cumulative utility after convergence:$averageUtilityAfterConvergence\n"
+    s"Cumulative utility prior to convergence: $averageUtilityBeforeConvergence\n" +
+    s"Cumulative utility after convergence: $averageUtilityAfterConvergence\n"
 }
 
 // Combination of two aggregated sets of results under different configuration, with statistics comparing the two

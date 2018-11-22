@@ -2,10 +2,11 @@ import scala.util.Random.{nextDouble => randomDouble, nextInt => randomInt}
 
 /**
   * Algorithms to generate networks, and utility functions to query them.
-  * Networks are structured as a set of (Int, Int) tuples representing each undirected edge between two
-  * nodes. The nodes are integers from 0 to numberOfNodes.
+  * Networks are structured as a set of (Agent, Agent) tuples representing each undirected edge between two
+  * nodes. The agents (nodes) are integers from 0 to numberOfNodes.
   */
 object Networks {
+  /** Type of an agent (an integer ID). */
   case class Agent (id: Int) extends AnyVal {
     override def toString: String = s"Ag$id"
   }
