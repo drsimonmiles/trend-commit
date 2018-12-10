@@ -22,19 +22,25 @@ case class InteractionRecord (round: Int, instigatorAgent: Agent, receiverAgent:
 case class SimulationRecord (initialStrategies: Vector[Action], actionRewards: Map[Agent, Map[Action, Double]],
                              strategies: Vector[Vector[Action]],
                              roundUtility: Vector[Double], interactions: Option[Vector[Vector[InteractionRecord]]]) {
-  // Returns the round where the population first converges to a norm, or -1 if no convergence
+  // A map of strategies to the proportion of agents holding them in a given round
+  def strategyPrevalences (round: Int): Map[Action, Double] =
+    strategies (round).groupBy (action => action).mapValues (_.size.toDouble / initialStrategies.size)
+  // The strategy held by the largest number of agents in a given round and the percentage of agents holding it
+  def mostPrevalentStrategy (round: Int): (Action, Double) =
+    strategyPrevalences (round).maxBy (_._2)
+  // The sum of rewards of agents for the given action
+  def populationActionReward (action: Action): Double =
+    actionRewards.values.map (_ (action)).sum
+  // The proportion of agents holding the most prevalent strategies in the final round
+  def highestFinalPrevalence: Double =
+    mostPrevalentStrategy (strategies.size - 1)._2
+  // The round where the population first converges to a norm, or -1 if no convergence
   def firstConvergesAt: Int = {
     // Returns true if any strategy has converged given the list of strategies agents have in a round
     def hasConverged (roundStrategies: Vector[Action]): Boolean =
       roundStrategies.distinct.exists (norm => (roundStrategies.count (_ == norm).toDouble / roundStrategies.size) > convergencePercentage)
     strategies.indexWhere (hasConverged)
   }
-  // Returns the strategy held by the largest number of agents in a given round
-  def mostPrevalentStrategy (round: Int): Action =
-    strategies (round).groupBy (action => action).mapValues (_.size).maxBy (_._2)._1
-  // Returns the sum of rewards of agents for the given action
-  def populationActionReward (action: Action): Double =
-    actionRewards.values.map (_ (action)).sum
 
   // Calculate the cumulative utility over the given rounds (from <= round < until) of a simulation. If from is None,
   // start from the first round. If until is None, end at the last simulation round.
@@ -47,11 +53,12 @@ case class SimulationRecord (initialStrategies: Vector[Action], actionRewards: M
   // Calculate the utility the population would get per round if all adopted the strategy converged to, or None if it doesn't converge
   def stablePopulationUtility: Option[Double] =
     if (firstConvergesAt == -1) None
-    else Some (populationActionReward (mostPrevalentStrategy (firstConvergesAt)))
+    else Some (populationActionReward (mostPrevalentStrategy (firstConvergesAt)._1))
 }
 
 // The aggregated record of multiple simulation runs of the same configuration, with statistics on how these performed on average
 class AggregateRecord (val configuration: Configuration, val runs: Vector[SimulationRecord]) {
+  val averageFinalPrevalence: Double = mean (runs.map (_.highestFinalPrevalence))
   // Generate a map of simulation records to the round where they first converged, excluding simulations that did not converge
   val firstConvergesAt: Map[SimulationRecord, Int] = runs.createMap (_.firstConvergesAt).filter (_._2 != -1)
   val proportionConverging: Double = firstConvergesAt.size.toDouble / runs.size
@@ -66,7 +73,8 @@ class AggregateRecord (val configuration: Configuration, val runs: Vector[Simula
   def averageUtilityFromRound (round: Int): Double =
     mean (runs.map (_.cumulativeUtility (Some (round), None)))
 
-  override def toString: String = runs.map (_.firstConvergesAt).toString +
+  override def toString: String =
+    s"Average proportion of agents with most prevalent strategy at end: ${averageFinalPrevalence * 100}%\n" +
     s"Simulations converging to a norm: ${proportionConverging * 100}%\n" +
     s"Average round first converged: $averageConvergeRound\n" +
     s"Total cumulative utility: $averageTotalUtility\n" +

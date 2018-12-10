@@ -1,6 +1,7 @@
 sealed trait NetworkType
 case object ScaleFreeNetwork extends NetworkType { override def toString = "scale-free" }
 case object SmallWorldNetwork extends NetworkType { override def toString = "small world" }
+
 case object FullyConnectedNetwork extends NetworkType { override def toString = "fully connected" }
 
 sealed trait LoggingLevel
@@ -24,6 +25,7 @@ case class Configuration ( // Network generation parameters
                            absoluteCoordinationCost: Boolean, // true = non-matching actions produce utility 0, false = decreasing utility as more different
                            interactionsInstigatedPerRound: Int, // Number of interactions each agent instigates per round
                            copyFrequency: Int, // How many rounds between agents copying each others' best strategies
+                           observeNeighbours: Boolean, // False: agents only observe rewards from own interactions, true: also observe neighbour interactions
                            proposalIterations: Int, // Number of re-evaluations of best strategy producing the same strategy before proposing it as mutual commitment
                            explorationProbability: Double, // Likelihood of an agent trying a random action for a round
                            mutualCommit: Boolean, // Is mutual commitment turned on?
@@ -70,7 +72,7 @@ case class Configuration ( // Network generation parameters
 // Configuration for real evaluation runs
 object ConfigurationA extends Configuration (
   numberOfAgents = 200,
-  networkType = FullyConnectedNetwork,
+  networkType = ScaleFreeNetwork,
   averageDegree = 4,
   nonLatticeProbability = 0.4,
   numberOfActions = 100,
@@ -78,10 +80,11 @@ object ConfigurationA extends Configuration (
   interactionsInstigatedPerRound = 1,
   explorationProbability = 0.01,
   copyFrequency = 1,
+  observeNeighbours = true,
   absoluteCoordinationCost = true,
   mutualCommit = false,
   numberOfRounds = 200,
-  numberOfSimulations = 100,
+  numberOfSimulations = 200,
   proposalIterations = 5,
   loggingLevel = NoLogging
 )
@@ -107,6 +110,7 @@ object ConfigurationB extends Configuration (
   interactionsInstigatedPerRound = 4,
   explorationProbability = 0.1,
   copyFrequency = 5,
+  observeNeighbours = false,
   absoluteCoordinationCost = true,
   mutualCommit = false,
   numberOfRounds = 10000,
@@ -126,6 +130,7 @@ object ConfigurationC extends Configuration (
   interactionsInstigatedPerRound = 2,
   explorationProbability = 0.01,
   copyFrequency = 1,
+  observeNeighbours = false,
   absoluteCoordinationCost = true,
   mutualCommit = false,
   numberOfRounds = 10,

@@ -2,16 +2,20 @@ import Experiment._
 import Output._
 
 object Main extends App {
-  println (Simulation.simulate (ConfigurationA))
+  println (Simulation.simulate (ConfigurationA.copy (observeNeighbours = false)))
+  println (Simulation.simulate (ConfigurationA.copy (observeNeighbours = true)))
+
+  // Standards case: Cost of changing strategy; copy based on how well currently doing (from wider observation?); no exploration?
+  // Innovation case: Initial action space removes a lot of actions; exploration allows some better to appear
 
   /**
     * Two measures to compare with and without mutual commit:
     *  - Utility lost from not committing: in time up to convergence in non-commit case, difference in cumulative utility
     *  - Quality of stable state: Difference in per-round population-aggregate utility of emergent strategy
     */
- /* val multiSeries = configMultiSequence (ConfigurationA.copy (proposalIterations = 1),
+ /*val multiSeries = configMultiSequence (ConfigurationA.copy (proposalIterations = 1),
     c => c.copy (mutualCommit = true), _.mutualCommit == true,
-    c => c.copy (proposalIterations = c.proposalIterations + 1), _.proposalIterations == 5)
+    c => c.copy (proposalIterations = c.proposalIterations + 1), _.proposalIterations == 10)
   val newResults: Vector[Vector[AggregateRecord]] =
     generateMultiSeries (multiSeries)
   println (newResults.flatten.map (_.averageTotalUtility).sum)

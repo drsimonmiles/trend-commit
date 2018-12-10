@@ -40,7 +40,8 @@ object Output {
     val c5 = "RHS stable utility" +: comparisons.map (_.condition2.averageStablePopulationUtility.toString)
     val stableGainColumn = "Stable utility gain" +: comparisons.map (_.stableUtilityGained.toString)
 
-    formatTable (Vector (variableColumn, c1, c2, c3, lostUtilityColumn, c4, c5, stableGainColumn))
+//    formatTable (Vector (variableColumn, c1, c2, c3, lostUtilityColumn, c4, c5, stableGainColumn))
+    formatTable (Vector (variableColumn, lostUtilityColumn, stableGainColumn))
   }
 
   def plotConvergence (records: AggregateRecord): Unit = {

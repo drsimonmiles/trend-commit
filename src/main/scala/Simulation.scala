@@ -37,9 +37,15 @@ object Simulation {
       interactionReward (instigatorAgent, instigatorAction, receiverAction, actionReward, coordinationReward),
       interactionReward (receiverAgent, receiverAction, instigatorAction, actionReward, coordinationReward))
 
-  // Return all interactions from the given set which the given agent observed, i.e. was a participant
-  def observedInteractions (observerAgent: Agent, records: Vector[InteractionRecord]): Vector[InteractionRecord] =
-    records.filter (record => record.instigatorAgent == observerAgent || record.receiverAgent == observerAgent)
+  // Return all interactions from the given set which the given agent was a participant
+  def participatedInteractions (agent: Agent, records: Vector[InteractionRecord]): Vector[InteractionRecord] =
+    records.filter (record => record.instigatorAgent == agent || record.receiverAgent == agent)
+
+  // Return all interactions from the given set which the given agent or one of its neighbours was a participant
+  def observedInteractions (agent: Agent, neighbours: Vector[Agent], records: Vector[InteractionRecord]): Vector[InteractionRecord] = {
+    val hood = agent +: neighbours
+    records.filter (record => hood.contains (record.instigatorAgent) || hood.contains (record.receiverAgent))
+  }
 
   // Extract the actions performed by instigators and the rewards received by them for each interaction in set
   def instigatorRewards (records: Vector[InteractionRecord]): Vector[(Action, Double)] =
@@ -117,8 +123,10 @@ object Simulation {
           logIfExtreme (logFlatHistory) (newHistory.flatten)
         // Get the interactions each agent observed within the history
         val observedHistory: Map[Agent, Vector[InteractionRecord]] =
-          logIfExtreme (logObservedHistory) (
-            agents.createMap (agent => observedInteractions (agent, allHistory)))
+          logIfExtreme (logObservedHistory) {
+            if (observeNeighbours) agents.createMap (agent => observedInteractions (agent, neighbours (agent), allHistory))
+            else agents.createMap (agent => participatedInteractions (agent, allHistory))
+          }
         val ratingPerAction: Map[Agent, Map[Action, Double]] =
           logIfExtreme (logActionRatings) (
             agents.createMap (agent => strategyRatings (observedHistory (agent))))
