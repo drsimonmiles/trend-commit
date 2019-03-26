@@ -1,7 +1,17 @@
+import Networks.Agent
 import Utilities.mean
 import co.theasi.plotly.{Plot, draw}
+import java.io.{File, FileWriter, PrintWriter}
 
 object Output {
+  // Save a DOT serialisation of the given network graph to the given file
+  def networkToDOT (graph: Vector[(Agent, Agent)], file: File): Unit = {
+    val writer = new PrintWriter (new FileWriter (file))
+    val dot = graph.map (edge => s"${edge._1.id} -- ${edge._2.id};").mkString ("graph network {\n  ", "\n  ", "\n}\n")
+    writer.println (dot)
+    writer.close ()
+  }
+
   // Format a matrix of data as a table with vertical padded columns, where the data is a vector of columns, each a vector of cells
   def formatTable (columns: Vector[Vector[String]]): String = {
     val widths: Vector[Int] = columns.map (_.map (_.length).max + 1)
@@ -51,7 +61,7 @@ object Output {
       mean (records.runs.map (_.strategies (round).count (_ == Action (0)).toDouble / config.numberOfAgents)))
     val plot = Plot ().withScatter (xs, ys)
 
-    draw (plot, s"Ac0 agents (${config.networkType} ${config.copyFrequency}-${config.absoluteCoordinationCost})")
+    draw (plot, s"Ac0 agents (${config.networkType} ${config.absoluteCoordinationCost})")
   }
 
 }

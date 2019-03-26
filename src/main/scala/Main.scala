@@ -1,9 +1,28 @@
 import Experiment._
 import Output._
+import Simulation.simulate
 
 object Main extends App {
-  println (Simulation.simulate (ConfigurationA.copy (observeNeighbours = false)))
-  println (Simulation.simulate (ConfigurationA.copy (observeNeighbours = true)))
+  simulate (ConfigurationA)
+  println (Measure.toString)
+
+  /*val startingPopulation = 90
+  val startingRounds = 200 //7500
+  val roundsIncrement = 100
+
+  def simulateToConvergence (config: Configuration): Configuration = {
+    println (s"Trying ${config.numberOfRounds} rounds for ${config.numberOfAgents} agents")
+    if (simulate (config).proportionConverging < 0.5)
+      simulateToConvergence (config.copy (numberOfRounds = config.numberOfRounds + roundsIncrement))
+    else config
+  }
+
+  (startingPopulation to 200 by 10).foldLeft (ConfigurationA.copy (numberOfRounds = startingRounds): Configuration) {
+    (config, population) =>
+      val found = simulateToConvergence (config.copy (numberOfAgents = population))
+      println ("Success")
+      found
+  }*/
 
   // Standards case: Cost of changing strategy; copy based on how well currently doing (from wider observation?); no exploration?
   // Innovation case: Initial action space removes a lot of actions; exploration allows some better to appear

@@ -21,7 +21,7 @@ case class InteractionRecord (round: Int, instigatorAgent: Agent, receiverAgent:
 // plus the full list of interaction records per round if debug is on
 case class SimulationRecord (initialStrategies: Vector[Action], actionRewards: Map[Agent, Map[Action, Double]],
                              strategies: Vector[Vector[Action]],
-                             roundUtility: Vector[Double], interactions: Option[Vector[Vector[InteractionRecord]]]) {
+                             roundUtility: Vector[Double]) {
   // A map of strategies to the proportion of agents holding them in a given round
   def strategyPrevalences (round: Int): Map[Action, Double] =
     strategies (round).groupBy (action => action).mapValues (_.size.toDouble / initialStrategies.size)
