@@ -1,28 +1,39 @@
+import java.io.{FileWriter, PrintWriter}
+
 import Experiment._
 import Output._
 import Simulation.simulate
 
 object Main extends App {
-  simulate (ConfigurationA)
-  println (Measure.toString)
+  //simulate (ConfigurationA)
+  //println (Measure.toString)
 
-  /*val startingPopulation = 90
-  val startingRounds = 200 //7500
+  def logLine (filename: String, line: String): Unit = {
+    val logger = new PrintWriter (new FileWriter (filename, true))
+    logger.println (line)
+    logger.close ()
+  }
+
+  val log = "convergence.txt"
+  val startingPopulation = 10
+  val endingPopulation = 20000
+  val startingRounds = 200
+  val populationIncrement = 10
   val roundsIncrement = 100
 
   def simulateToConvergence (config: Configuration): Configuration = {
-    println (s"Trying ${config.numberOfRounds} rounds for ${config.numberOfAgents} agents")
+    logLine (log, s"Trying ${config.numberOfRounds} rounds for ${config.numberOfAgents} agents")
     if (simulate (config).proportionConverging < 0.5)
       simulateToConvergence (config.copy (numberOfRounds = config.numberOfRounds + roundsIncrement))
     else config
   }
 
-  (startingPopulation to 200 by 10).foldLeft (ConfigurationA.copy (numberOfRounds = startingRounds): Configuration) {
+  (startingPopulation to endingPopulation by populationIncrement).foldLeft (ConfigurationA.copy (numberOfRounds = startingRounds): Configuration) {
     (config, population) =>
       val found = simulateToConvergence (config.copy (numberOfAgents = population))
-      println ("Success")
+      logLine (log, "Success")
       found
-  }*/
+  }
 
   // Standards case: Cost of changing strategy; copy based on how well currently doing (from wider observation?); no exploration?
   // Innovation case: Initial action space removes a lot of actions; exploration allows some better to appear

@@ -1,7 +1,7 @@
 import java.lang.System.currentTimeMillis
 
 object Measure {
-  val measuring: Boolean = true
+  val measuring: Boolean = false
 
   // Each block is measured by minimum time spent, maximum time spent, total time spent, number of calls to block
   private val times = scala.collection.mutable.Map[String, (Long, Long, Long, Long)] ()
